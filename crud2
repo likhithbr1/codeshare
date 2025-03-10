@@ -1,0 +1,177 @@
+package com.example.coursemanagement;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CourseManagementApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(CourseManagementApplication.class, args);
+    }
+}
+
+
+package com.example.coursemanagement.model;
+
+public class Course {
+    
+    private Long courseId;
+    private String courseName;
+    private String courseTeacher;
+
+    // Constructor
+    public Course(Long courseId, String courseName, String courseTeacher) {
+        this.courseId = courseId;
+        this.courseName = courseName;
+        this.courseTeacher = courseTeacher;
+    }
+
+    // Getters and Setters
+    public Long getCourseId() {
+        return courseId;
+    }
+
+    public void setCourseId(Long courseId) {
+        this.courseId = courseId;
+    }
+
+    public String getCourseName() {
+        return courseName;
+    }
+
+    public void setCourseName(String courseName) {
+        this.courseName = courseName;
+    }
+
+    public String getCourseTeacher() {
+        return courseTeacher;
+    }
+
+    public void setCourseTeacher(String courseTeacher) {
+        this.courseTeacher = courseTeacher;
+    }
+}
+
+
+package com.example.coursemanagement.service;
+
+import com.example.coursemanagement.model.Course;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class CourseService {
+
+    private List<Course> courseList = new ArrayList<>();
+    private long courseIdCounter = 1;
+
+    // Create a new course
+    public Course createCourse(Course course) {
+        course.setCourseId(courseIdCounter++);
+        courseList.add(course);
+        return course;
+    }
+
+    // Get all courses
+    public List<Course> getAllCourses() {
+        return courseList;
+    }
+
+    // Get a course by ID
+    public Optional<Course> getCourseById(Long courseId) {
+        return courseList.stream()
+                .filter(course -> course.getCourseId().equals(courseId))
+                .findFirst();
+    }
+
+    // Get courses by Name
+    public List<Course> getCourseByName(String courseName) {
+        List<Course> result = new ArrayList<>();
+        for (Course course : courseList) {
+            if (course.getCourseName().equalsIgnoreCase(courseName)) {
+                result.add(course);
+            }
+        }
+        return result;
+    }
+
+    // Delete a course by ID
+    public boolean deleteCourse(Long courseId) {
+        return courseList.removeIf(course -> course.getCourseId().equals(courseId));
+    }
+
+    // Update an existing course
+    public boolean updateCourse(Long courseId, Course updatedCourse) {
+        for (Course course : courseList) {
+            if (course.getCourseId().equals(courseId)) {
+                course.setCourseName(updatedCourse.getCourseName());
+                course.setCourseTeacher(updatedCourse.getCourseTeacher());
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+package com.example.coursemanagement.controller;
+
+import com.example.coursemanagement.model.Course;
+import com.example.coursemanagement.service.CourseService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+
+    @Autowired
+    private CourseService courseService;
+
+    // POST - Create a new course
+    @PostMapping
+    public ResponseEntity<Course> createCourse(@RequestBody Course course) {
+        Course createdCourse = courseService.createCourse(course);
+        return ResponseEntity.ok(createdCourse);
+    }
+
+    // GET - Get all courses
+    @GetMapping
+    public List<Course> getAllCourses() {
+        return courseService.getAllCourses();
+    }
+
+    // GET - Get course by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<Course> getCourseById(@PathVariable Long id) {
+        return courseService.getCourseById(id)
+                .map(course -> ResponseEntity.ok(course))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // GET - Get courses by Name
+    @GetMapping("/name/{name}")
+    public List<Course> getCourseByName(@PathVariable String name) {
+        return courseService.getCourseByName(name);
+    }
+
+    // DELETE - Delete course by ID
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
+        boolean isDeleted = courseService.deleteCourse(id);
+        return isDeleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
+
+    // PUT - Update a course
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> updateCourse(@PathVariable Long id, @RequestBody Course updatedCourse) {
+        boolean isUpdated = courseService.updateCourse(id, updatedCourse);
+        return isUpdated ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
+}
+
