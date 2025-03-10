@@ -74,3 +74,39 @@ public class CourseManagementApplication {
         SpringApplication.run(CourseManagementApplication.class, args);
     }
 }
+
+
+----------------------------------------------------
+-----------------------------------------------------
+
+@Service
+public class CourseService {
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    public Course createCourse(Course course) {
+        return courseRepository.save(course);
+    }
+
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
+
+    public Course getCourseByName(String courseName) {
+        return courseRepository.findByCourseName(courseName)
+               .stream().findFirst().orElseThrow(() -> new RuntimeException("Course not found"));
+    }
+
+    public void deleteCourse(Long courseId) {
+        courseRepository.deleteById(courseId);
+    }
+
+    public Course updateCourse(Long courseId, Course course) {
+        Course existingCourse = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found"));
+        existingCourse.setCourseName(course.getCourseName());
+        existingCourse.setCourseTeacher(course.getCourseTeacher());
+        return courseRepository.save(existingCourse);
+    }
+}
