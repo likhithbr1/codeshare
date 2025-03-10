@@ -1,0 +1,79 @@
+package com.example.coursemanagement.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
+public class Course {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String courseName;
+    private String courseTeacher;
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getCourseName() {
+        return courseName;
+    }
+
+    public void setCourseName(String courseName) {
+        this.courseName = courseName;
+    }
+
+    public String getCourseTeacher() {
+        return courseTeacher;
+    }
+
+    public void setCourseTeacher(String courseTeacher) {
+        this.courseTeacher = courseTeacher;
+    }
+}
+
+
+  package com.example.coursemanagement.controller;
+
+import com.example.coursemanagement.model.Course;
+import com.example.coursemanagement.repository.CourseRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    @PostMapping
+    public ResponseEntity<Course> createCourse(@RequestBody Course course) {
+        Course savedCourse = courseRepository.save(course);
+        return ResponseEntity.ok(savedCourse);
+    }
+}
+
+
+    package com.example.coursemanagement;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CourseManagementApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CourseManagementApplication.class, args);
+    }
+}
