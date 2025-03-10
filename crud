@@ -1,0 +1,76 @@
+package com.example.coursemanagement.controller;
+
+import com.example.coursemanagement.model.Course;
+import com.example.coursemanagement.repository.CourseRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    // POST - Create a new course
+    @PostMapping
+    public ResponseEntity<Course> createCourse(@RequestBody Course course) {
+        return new ResponseEntity<>(courseRepository.save(course), HttpStatus.CREATED);
+    }
+
+    // GET - Get all courses
+    @GetMapping
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
+
+    // GET - Get a course by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<Course> getCourseById(@PathVariable Long id) {
+        return courseRepository.findById(id)
+                .map(course -> ResponseEntity.ok().body(course))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // DELETE - Delete a course by ID
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
+        return courseRepository.findById(id)
+                .map(course -> {
+                    courseRepository.delete(course);
+                    return ResponseEntity.noContent().build();
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // PUT - Update a course
+    @PutMapping("/{id}")
+    public ResponseEntity<Course> updateCourse(@PathVariable Long id, @RequestBody Course course) {
+        return courseRepository.findById(id)
+                .map(existingCourse -> {
+                    existingCourse.setCourseName(course.getCourseName());
+                    existingCourse.setCourseTeacher(course.getCourseTeacher());
+                    return ResponseEntity.ok(courseRepository.save(existingCourse));
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+
+
+
+package com.example.coursemanagement;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CourseManagementApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CourseManagementApplication.class, args);
+    }
+}
