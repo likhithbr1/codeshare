@@ -1,0 +1,288 @@
+Got it! You're now enhancing your project by:  
+✅ Adding a **Student** entity.  
+✅ Updating **Course** to hold a list of students.  
+✅ Using **H2 database + Hibernate (JPA)** for persistence.  
+✅ Implementing **One-to-Many (Course → Students) and Many-to-One (Students → Course) relationships**.  
+
+---
+
+### **1️⃣ Update `Course.java` (Model)**
+Modify the Course entity to hold a list of students and make it a JPA entity.  
+```java
+package com.example.coursemanagement.model;
+
+import jakarta.persistence.*;
+import java.util.List;
+
+@Entity  // Marks it as a JPA entity
+public class Course {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long courseId;
+
+    private String courseName;
+    private String courseTeacher;
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL) // One course can have multiple students
+    private List<Student> students;
+
+    // Constructors
+    public Course() {}
+
+    public Course(String courseName, String courseTeacher) {
+        this.courseName = courseName;
+        this.courseTeacher = courseTeacher;
+    }
+
+    // Getters and Setters
+    public Long getCourseId() { return courseId; }
+    public void setCourseId(Long courseId) { this.courseId = courseId; }
+
+    public String getCourseName() { return courseName; }
+    public void setCourseName(String courseName) { this.courseName = courseName; }
+
+    public String getCourseTeacher() { return courseTeacher; }
+    public void setCourseTeacher(String courseTeacher) { this.courseTeacher = courseTeacher; }
+
+    public List<Student> getStudents() { return students; }
+    public void setStudents(List<Student> students) { this.students = students; }
+}
+```
+
+---
+
+### **2️⃣ Create `Student.java` (Model)**
+Each student **belongs to one course**, but **a course can have many students** (Many-to-One).  
+```java
+package com.example.coursemanagement.model;
+
+import jakarta.persistence.*;
+
+@Entity
+public class Student {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long studentId;
+
+    private String studentName;
+    private String address;
+
+    @ManyToOne // Many students can belong to one course
+    @JoinColumn(name = "course_id")
+    private Course course;
+
+    // Constructors
+    public Student() {}
+
+    public Student(String studentName, String address, Course course) {
+        this.studentName = studentName;
+        this.address = address;
+        this.course = course;
+    }
+
+    // Getters and Setters
+    public Long getStudentId() { return studentId; }
+    public void setStudentId(Long studentId) { this.studentId = studentId; }
+
+    public String getStudentName() { return studentName; }
+    public void setStudentName(String studentName) { this.studentName = studentName; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public Course getCourse() { return course; }
+    public void setCourse(Course course) { this.course = course; }
+}
+```
+
+---
+
+### **3️⃣ Create `CourseRepository.java` and `StudentRepository.java`**
+These interfaces **connect to the H2 database**.  
+```java
+package com.example.coursemanagement.repository;
+
+import com.example.coursemanagement.model.Course;
+import org.springframework.data.jpa.repository.JpaRepository;
+public interface CourseRepository extends JpaRepository<Course, Long> {
+}
+```
+
+```java
+package com.example.coursemanagement.repository;
+
+import com.example.coursemanagement.model.Student;
+import org.springframework.data.jpa.repository.JpaRepository;
+public interface StudentRepository extends JpaRepository<Student, Long> {
+}
+```
+
+---
+
+### **4️⃣ Update `CourseService.java` to Use Database**
+Modify service to **use JPA instead of a list**.  
+```java
+package com.example.coursemanagement.service;
+
+import com.example.coursemanagement.model.Course;
+import com.example.coursemanagement.model.Student;
+import com.example.coursemanagement.repository.CourseRepository;
+import com.example.coursemanagement.repository.StudentRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class CourseService {
+
+    private final CourseRepository courseRepository;
+    private final StudentRepository studentRepository;
+
+    public CourseService(CourseRepository courseRepository, StudentRepository studentRepository) {
+        this.courseRepository = courseRepository;
+        this.studentRepository = studentRepository;
+    }
+
+    public Course createCourse(Course course) {
+        return courseRepository.save(course);
+    }
+
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
+
+    public Optional<Course> getCourseById(Long courseId) {
+        return courseRepository.findById(courseId);
+    }
+
+    public void deleteCourse(Long courseId) {
+        courseRepository.deleteById(courseId);
+    }
+
+    public Student addStudentToCourse(Long courseId, Student student) {
+        Course course = courseRepository.findById(courseId).orElseThrow(() -> new RuntimeException("Course not found"));
+        student.setCourse(course);
+        return studentRepository.save(student);
+    }
+}
+```
+
+---
+
+### **5️⃣ Update `CourseController.java`**
+Expose REST APIs to **handle students inside courses**.  
+```java
+package com.example.coursemanagement.controller;
+
+import com.example.coursemanagement.model.Course;
+import com.example.coursemanagement.model.Student;
+import com.example.coursemanagement.service.CourseService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+
+    private final CourseService courseService;
+
+    public CourseController(CourseService courseService) {
+        this.courseService = courseService;
+    }
+
+    @PostMapping
+    public ResponseEntity<Course> createCourse(@RequestBody Course course) {
+        return ResponseEntity.ok(courseService.createCourse(course));
+    }
+
+    @GetMapping
+    public List<Course> getAllCourses() {
+        return courseService.getAllCourses();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Course> getCourseById(@PathVariable Long id) {
+        return courseService.getCourseById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/students")
+    public ResponseEntity<Student> addStudentToCourse(@PathVariable Long id, @RequestBody Student student) {
+        return ResponseEntity.ok(courseService.addStudentToCourse(id, student));
+    }
+}
+```
+
+---
+
+### **6️⃣ Add H2 Database Configuration**
+Add this to **`application.properties`**:  
+```
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.h2.console.enabled=true
+```
+📌 Now, go to **http://localhost:8080/h2-console** to see the database!
+
+---
+
+### **7️⃣ Testing the APIs Using Postman**
+#### **1. Create a Course**
+- **Method**: `POST`
+- **URL**: `http://localhost:8080/courses`
+- **Body (JSON)**:
+```json
+{
+    "courseName": "Java Basics",
+    "courseTeacher": "John Doe"
+}
+```
+📌 **Response**:  
+```json
+{
+    "courseId": 1,
+    "courseName": "Java Basics",
+    "courseTeacher": "John Doe",
+    "students": []
+}
+```
+
+#### **2. Get All Courses**
+- **Method**: `GET`
+- **URL**: `http://localhost:8080/courses`
+
+#### **3. Add a Student to a Course**
+- **Method**: `POST`
+- **URL**: `http://localhost:8080/courses/1/students`
+- **Body (JSON)**:
+```json
+{
+    "studentName": "Alice",
+    "address": "123 Main St"
+}
+```
+
+#### **4. Get Course with Students**
+- **Method**: `GET`
+- **URL**: `http://localhost:8080/courses/1`
+
+📌 Now, the response **includes students** in the course!
+
+---
+
+### **Final Thoughts**
+🚀 Now your app:  
+✅ Stores Courses & Students in **H2 Database**  
+✅ Supports **One-to-Many Relationship**  
+✅ Can retrieve Courses **with their Students**  
+
+This is **real-world Course-Student management**! Want to add more features like **updating/deleting students**? 😃
