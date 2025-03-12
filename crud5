@@ -1,0 +1,222 @@
+To integrate **Reactive Programming** using **Project Reactor** (Flux & Mono) into your existing **Spring Boot application**, you need to make the following changes:
+
+### **1. Update Dependencies in `pom.xml`**
+If you haven't already, add the **Spring WebFlux** dependency:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+```
+
+---
+
+### **2. Modify the Repository (Use `R2dbcRepository` Instead of `JpaRepository`)**
+Since `JpaRepository` is blocking, replace it with **ReactiveCrudRepository**.
+
+#### **Old `CourseRepository.java` (Blocking JPA)**
+```java
+@Repository
+public interface CourseRepository extends JpaRepository<Course, Long> {
+}
+```
+
+#### **New `CourseRepository.java` (Reactive)**
+```java
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
+
+@Repository
+public interface CourseRepository extends ReactiveCrudRepository<Course, Long> {
+    Flux<Course> findAll();
+}
+```
+
+---
+
+### **3. Modify the Service Layer**
+- Use **Mono<T>** for saving data (single object).
+- Use **Flux<T>** for retrieving multiple objects.
+
+#### **Old `CourseService.java` (Blocking)**
+```java
+@Service
+public class CourseService {
+    @Autowired
+    private CourseRepository courseRepository;
+
+    public Course saveCourse(Course course) {
+        return courseRepository.save(course);
+    }
+
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
+}
+```
+
+#### **New `CourseService.java` (Reactive)**
+```java
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+public class CourseService {
+    @Autowired
+    private CourseRepository courseRepository;
+
+    public Mono<Course> saveCourse(Course course) {
+        return courseRepository.save(course);
+    }
+
+    public Flux<Course> getAllCourses() {
+        return courseRepository.findAll(); // Returns multiple courses as Flux
+    }
+}
+```
+
+---
+
+### **4. Modify the Controller Layer**
+Replace `@RestController` methods with **Reactive WebFlux endpoints**.
+
+#### **Old `CourseController.java` (Blocking)**
+```java
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+    @Autowired
+    private CourseService courseService;
+
+    @PostMapping
+    public ResponseEntity<Course> saveCourse(@RequestBody Course course) {
+        Course savedCourse = courseService.saveCourse(course);
+        return ResponseEntity.ok(savedCourse);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Course>> getAllCourses() {
+        List<Course> courses = courseService.getAllCourses();
+        return ResponseEntity.ok(courses);
+    }
+}
+```
+
+#### **New `CourseController.java` (Reactive)**
+```java
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+    @Autowired
+    private CourseService courseService;
+
+    @PostMapping
+    public Mono<ResponseEntity<Course>> saveCourse(@RequestBody Course course) {
+        return courseService.saveCourse(course)
+                .map(savedCourse -> ResponseEntity.ok(savedCourse));
+    }
+
+    @GetMapping
+    public Flux<Course> getAllCourses() {
+        return courseService.getAllCourses();
+    }
+}
+```
+
+---
+
+### **5. Update StudentRepository (For Reactive Programming)**
+Similar to `CourseRepository`, replace `JpaRepository` with **ReactiveCrudRepository**.
+
+#### **New `StudentRepository.java` (Reactive)**
+```java
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
+
+@Repository
+public interface StudentRepository extends ReactiveCrudRepository<Student, Long> {
+    Flux<Student> findAllByCourseId(Long courseId);
+}
+```
+
+---
+
+### **6. Update StudentService**
+Modify methods to return `Mono<T>` (single object) and `Flux<T>` (multiple objects).
+
+#### **New `StudentService.java` (Reactive)**
+```java
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+public class StudentService {
+    @Autowired
+    private StudentRepository studentRepository;
+
+    public Mono<Student> saveStudent(Student student) {
+        return studentRepository.save(student);
+    }
+
+    public Flux<Student> getStudentsByCourse(Long courseId) {
+        return studentRepository.findAllByCourseId(courseId);
+    }
+}
+```
+
+---
+
+### **7. Update StudentController**
+Modify the controller to use **Flux and Mono**.
+
+#### **New `StudentController.java` (Reactive)**
+```java
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+@RequestMapping("/students")
+public class StudentController {
+    @Autowired
+    private StudentService studentService;
+
+    @PostMapping
+    public Mono<ResponseEntity<Student>> saveStudent(@RequestBody Student student) {
+        return studentService.saveStudent(student)
+                .map(savedStudent -> ResponseEntity.ok(savedStudent));
+    }
+
+    @GetMapping("/course/{courseId}")
+    public Flux<Student> getStudentsByCourse(@PathVariable Long courseId) {
+        return studentService.getStudentsByCourse(courseId);
+    }
+}
+```
+
+---
+
+### **Final Changes Summary**
+| Layer | Old (Blocking) | New (Reactive) |
+|--------|--------------|----------------|
+| **Repository** | `JpaRepository` | `ReactiveCrudRepository` |
+| **Service** | Returns `Course` or `List<Course>` | Returns `Mono<Course>` or `Flux<Course>` |
+| **Controller** | `ResponseEntity<Course>` | Uses `Mono` or `Flux` |
+| **Database** | Uses JPA (Hibernate) | Uses **R2DBC (Reactive Database Connectivity)** |
+
+### **Next Steps**
+1. Ensure you are using **R2DBC** for database operations.
+2. Run the application and test with **Postman** or **WebFlux client**.
+3. Verify that the application works **reactively** with **non-blocking I/O**.
+
+---
+
+### **Final Thoughts**
+- **Mono<T>** is used for **saving a single object**.
+- **Flux<T>** is used for **retrieving multiple objects**.
+- **Spring WebFlux** enables truly **reactive programming**, making your app scalable and efficient.
+
+Would you like additional explanations on any part? 🚀
