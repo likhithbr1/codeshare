@@ -65,3 +65,36 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+from huggingface_hub import login
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+# 🔹 Replace 'your_huggingface_token_here' with your actual token
+HUGGINGFACE_TOKEN = "your_huggingface_token_here"
+
+# ✅ Login manually
+login(HUGGINGFACE_TOKEN)
+
+# Model details
+MODEL_NAME = "google/gemma-2b"
+
+# 🔹 Load tokenizer and model
+print("⏳ Loading Gemma-2B model... This may take a minute.")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
+
+# Sample prompt
+prompt = "Translate the following English text to French: 'Hello, how are you?'"
+
+# Tokenize input
+inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+
+# Generate response
+with torch.no_grad():
+    outputs = model.generate(**inputs, max_new_tokens=50)
+
+# Decode and print result
+response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+print("\n💬 AI Response:", response)
