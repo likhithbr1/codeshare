@@ -1,8 +1,9 @@
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 # Model Name (TinyLlama)
-MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Check Hugging Face for latest versions
+MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
 # Load Model and Tokenizer
 def load_model():
@@ -10,8 +11,8 @@ def load_model():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
-        torch_dtype=torch.float16,  # Use float16 for efficiency
-        device_map="auto",         # Automatically choose the best available device
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,  # Handle CPU/GPU
+        device_map="auto", 
     )
     print("✅ Model loaded successfully!")
     return tokenizer, model
@@ -19,15 +20,12 @@ def load_model():
 # Generate SQL Query
 def generate_sql(question, schema, tokenizer, model, max_tokens=128):
     input_text = (
-        "You are an expert SQL query generator. "
+        "You are an expert SQL query generator.\n"
         "Generate a syntactically correct SQL query based on the given schema and question.\n\n"
         f"### Schema:\n{schema}\n\n"
         f"### Question:\n{question}\n\n"
-        "### Rules:\n"
-        "- Only generate the SQL query, nothing else.\n"
-        "- Ensure proper syntax and use appropriate SQL keywords.\n"
-        "- Do not explain your response.\n\n"
-        "### SQL Query:\n"
+        "### Response:\n"
+        "SQL QUERY:\n"
     )
 
     pipe = pipeline(
@@ -35,19 +33,19 @@ def generate_sql(question, schema, tokenizer, model, max_tokens=128):
         model=model,
         tokenizer=tokenizer,
         max_new_tokens=max_tokens,
-        do_sample=False,   # No randomness for consistent output
-        temperature=0.1,   # Low temperature to ensure deterministic responses
-        top_p=0.9,        # Nucleus sampling for improved quality
+        do_sample=True,   # Enable sampling for better SQL generation
+        temperature=0.3,   # Adjusted for balanced accuracy
+        top_p=0.9,       
         return_full_text=False,
     )
 
-    sql_query = pipe(input_text, num_return_sequences=1)[0]["generated_text"]
+    generated_text = pipe(input_text, num_return_sequences=1)[0]["generated_text"]
 
-    # Ensure output starts with a valid SQL statement (e.g., SELECT, INSERT, etc.)
-    sql_query = sql_query.strip()
+    # Post-process output to ensure valid SQL query
+    sql_query = generated_text.strip().split("\n")[0]  # Take only the first line
     if not sql_query.upper().startswith(("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP")):
-        sql_query = "INVALID SQL OUTPUT"
-
+        return "ERROR: Model failed to generate a valid SQL query."
+    
     return sql_query
 
 def main():
