@@ -1,0 +1,76 @@
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+
+# Model name
+MODEL_NAME = "defog/sqlcoder-7b-2"
+
+# Load tokenizer and model once
+def load_model():
+    print("⏳ Loading model... This may take a minute.")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        trust_remote_code=True,
+        torch_dtype=torch.bfloat16,  # Use bfloat16 for better CPU performance
+        device_map="cpu",            # Ensure model runs on CPU
+        use_cache=True,
+    )
+    print("✅ Model loaded successfully!")
+    return tokenizer, model
+
+# Generate prompt based on schema
+def generate_prompt(question, metadata_file="metadata.sql"):
+    with open(metadata_file, "r") as f:
+        table_metadata_string = f.read()
+
+    prompt = f"Generate an SQL query based on the following question and schema.\n\n" \
+             f"Question: {question}\nSchema:\n{table_metadata_string}"
+    return prompt
+
+# Run inference
+def generate_sql(question, tokenizer, model, metadata_file="metadata.sql"):
+    prompt = generate_prompt(question, metadata_file)
+    eos_token_id = tokenizer.eos_token_id
+
+    pipe = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=100,  # Reduced max tokens for faster output
+        do_sample=True,      # Use sampling for diversity
+        temperature=0.7,     # Controls randomness (lower = more predictable)
+        top_p=0.9,           # Use nucleus sampling instead of beam search
+        return_full_text=False,
+    )
+
+    generated_query = (
+        pipe(
+            prompt,
+            num_return_sequences=1,
+            eos_token_id=eos_token_id,
+            pad_token_id=eos_token_id,
+        )[0]["generated_text"]
+        .split(";")[0]
+        .split("```")[0]
+        .strip()
+        + ";"
+    )
+    return generated_query
+
+if __name__ == "__main__":
+    # Load the model once
+    tokenizer, model = load_model()
+
+    print("\n🔹 SQL Query Generator is ready! Type your question below.")
+    print("🛑 Type 'exit' to quit the application.\n")
+
+    # Keep taking user input until they type 'exit'
+    while True:
+        question = input("💬 Enter your question: ")
+        if question.lower() in ["exit", "quit"]:
+            print("👋 Exiting application. Goodbye!")
+            break
+
+        print("\n⏳ Generating SQL Query...\n")
+        sql_query = generate_sql(question, tokenizer, model)
+        print(f"✅ Generated SQL Query:\n{sql_query}\n")
