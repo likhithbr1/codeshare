@@ -1,6 +1,8 @@
 from huggingface_hub import login
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+import time
+import sys  # Required for real-time printing
 
 # 🔹 Step 1: Manually Login using Access Token
 HUGGINGFACE_TOKEN = "your_huggingface_token_here"  # Replace with your token
@@ -42,5 +44,11 @@ while True:
 
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    # 🔹 Step 7: Print Response
-    print("\n💬 AI Response:\n", response, "\n")
+    # 🔹 Step 7: Print Response Word by Word
+    print("\n💬 AI Response:\n", end="", flush=True)
+    for word in response.split():
+        sys.stdout.write(word + " ")  # Print each word with a space
+        sys.stdout.flush()  # Ensure it appears immediately
+        time.sleep(0.1)  # Add delay for effect
+    print("\n")  # New line after complete response
+
