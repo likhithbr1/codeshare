@@ -38,16 +38,17 @@ while True:
     input_text = f"Schema:\n{SCHEMA}\n\nQuestion:\n{question}\n\nAnswer:"
     input_ids = tokenizer(input_text, return_tensors="pt")
 
-    # 🔹 Step 6: Generate Response **Token-by-Token**
-    print("\n💬 AI Response:\n", end="", flush=True)
-
+    # 🔹 Step 6: Generate Response
     with torch.no_grad():
-        for output in model.generate(**input_ids, max_new_tokens=100, do_sample=True, output_scores=True):
-            response = tokenizer.decode(output, skip_special_tokens=True)
-            for token in response:
-                sys.stdout.write(token)
-                sys.stdout.flush()
-                time.sleep(0.05)  # Adjust typing speed
+        outputs = model.generate(**input_ids, max_new_tokens=100)
 
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # 🔹 Step 7: Print Response Word by Word
+    print("\n💬 AI Response:\n", end="", flush=True)
+    for word in response.split():
+        sys.stdout.write(word + " ")  # Print each word with a space
+        sys.stdout.flush()  # Ensure it appears immediately
+        time.sleep(0.1)  # Add delay for effect
     print("\n")  # New line after complete response
 
