@@ -1,0 +1,81 @@
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+
+# Model Name (TinyLlama)
+MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Check Hugging Face for latest versions
+
+# Load Model and Tokenizer
+def load_model():
+    print("⏳ Loading TinyLlama model... This may take a minute.")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        torch_dtype=torch.float16,  # Use float16 for efficiency
+        device_map="auto",         # Automatically choose the best available device
+    )
+    print("✅ Model loaded successfully!")
+    return tokenizer, model
+
+# Generate SQL Query
+def generate_sql(question, schema, tokenizer, model, max_tokens=128):
+    input_text = (
+        "You are an expert SQL query generator. "
+        "Generate a syntactically correct SQL query based on the given schema and question.\n\n"
+        f"### Schema:\n{schema}\n\n"
+        f"### Question:\n{question}\n\n"
+        "### Rules:\n"
+        "- Only generate the SQL query, nothing else.\n"
+        "- Ensure proper syntax and use appropriate SQL keywords.\n"
+        "- Do not explain your response.\n\n"
+        "### SQL Query:\n"
+    )
+
+    pipe = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=max_tokens,
+        do_sample=False,   # No randomness for consistent output
+        temperature=0.1,   # Low temperature to ensure deterministic responses
+        top_p=0.9,        # Nucleus sampling for improved quality
+        return_full_text=False,
+    )
+
+    sql_query = pipe(input_text, num_return_sequences=1)[0]["generated_text"]
+
+    # Ensure output starts with a valid SQL statement (e.g., SELECT, INSERT, etc.)
+    sql_query = sql_query.strip()
+    if not sql_query.upper().startswith(("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP")):
+        sql_query = "INVALID SQL OUTPUT"
+
+    return sql_query
+
+def main():
+    # Load model once
+    tokenizer, model = load_model()
+
+    # Load schema from file
+    schema_file = 'schema.txt'
+    try:
+        with open(schema_file, 'r') as f:
+            schema = f.read().strip()
+        print("✅ Schema loaded.")
+    except FileNotFoundError:
+        print(f"❌ Error: {schema_file} not found.")
+        return
+
+    print("\n🔹 Text-to-SQL Generator is ready! Type your question below.")
+    print("🛑 Type 'exit' to quit the application.\n")
+
+    while True:
+        question = input("💬 Enter your natural language question: ")
+        if question.lower() in ["exit", "quit"]:
+            print("👋 Exiting application. Goodbye!")
+            break
+
+        print("\n⏳ Generating SQL Query...\n")
+        sql_query = generate_sql(question, schema, tokenizer, model)
+        print(f"✅ Generated SQL Query:\n{sql_query}\n")
+
+if __name__ == "__main__":
+    main()
