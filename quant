@@ -1,0 +1,43 @@
+import sys
+from transformers import pipeline
+
+# Load the text-generation pipeline with SQLCoder model
+pipe = pipeline("text-generation", model="QuantFactory/sqlcoder-7b-2-GGUF")
+
+# Define the database schema
+schema = """
+CREATE TABLE employees (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    department VARCHAR(50),
+    salary INT,
+    hire_date DATE
+);
+
+CREATE TABLE departments (
+    id INT PRIMARY KEY,
+    name VARCHAR(50),
+    manager_id INT,
+    FOREIGN KEY (manager_id) REFERENCES employees(id)
+);
+"""
+
+# Get user input for the question
+question = input("Enter your natural language question: ")
+
+# Format the prompt
+prompt = f"""
+### Schema:
+{schema}
+
+### Question:
+{question}
+
+### SQL Query:
+"""
+
+# Run inference
+output = pipe(prompt, max_new_tokens=256, do_sample=True)
+
+# Print the generated SQL query
+print("\nGenerated SQL Query:\n", output[0]['generated_text'].replace(prompt, ""))
