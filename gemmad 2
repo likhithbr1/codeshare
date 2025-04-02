@@ -1,0 +1,91 @@
+import pymysql
+from sqlalchemy import create_engine
+from langchain_community.utilities import SQLDatabase
+from langchain.chains import create_sql_query_chain
+from langchain.prompts import PromptTemplate
+from langchain_community.llms import HuggingFacePipeline
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from huggingface_hub import login
+
+# 🔹 Step 1: MySQL Database Configuration
+MYSQL_USER = "your_username"
+MYSQL_PASSWORD = "your_password"
+MYSQL_HOST = "localhost"
+MYSQL_DATABASE = "your_database"
+
+# 🔹 Step 2: Optimized MySQL Connection with Pooling
+engine = create_engine(
+    f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{MYSQL_DATABASE}",
+    pool_size=10,
+    max_overflow=5
+)
+db = SQLDatabase(engine)
+
+# 🔹 Step 3: Fetch Table Metadata (Schema Introspection)
+def get_table_schema():
+    """Fetch table names and column details dynamically from the database."""
+    schema_info = ""
+    table_names = db.get_usable_table_names()
+
+    for table in table_names:
+        schema_info += f"\nTable: {table}\n"
+        schema_info += db.run(f"DESCRIBE {table};")  # Fetch columns dynamically
+
+    return schema_info
+
+SCHEMA = get_table_schema()
+
+# 🔹 Step 4: Set Up Hugging Face's Gemma-2B Model
+HUGGINGFACE_TOKEN = "your_token_here"
+login(HUGGINGFACE_TOKEN)
+
+MODEL_NAME = "google/gemma-2b"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16, device_map="auto")
+
+# Hugging Face pipeline for inference
+pipeline_model = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=150)
+
+# Wrap in LangChain's LLM Interface
+llm = HuggingFacePipeline(pipeline=pipeline_model)
+
+# 🔹 Step 5: Define SQL Query Generation Chain
+prompt = PromptTemplate.from_template(
+    """
+    Given the following MySQL database schema:
+
+    {schema}
+
+    Convert the following natural language query into an optimized SQL query:
+
+    "{question}"
+
+    Respond only with the SQL query and no explanations.
+    """
+)
+
+sql_chain = create_sql_query_chain(llm, db, prompt)
+
+# 🔹 Step 6: Chatbot Interaction Loop
+print("\n🔹 AI-powered MySQL Chatbot is ready!")
+print("💬 Ask a question about your database. Type 'exit' to quit.\n")
+
+while True:
+    question = input("💬 Enter your query: ")
+
+    if question.lower() in ["exit", "quit"]:
+        print("👋 Exiting... Goodbye!")
+        break
+
+    try:
+        # 🔹 Generate the SQL Query
+        query = sql_chain.run(question, schema=SCHEMA)
+        print("\n💬 Generated SQL Query:\n", query, "\n")
+
+        # 🔹 Execute the Query and Fetch Results
+        result = db.run(query)
+        print("📊 Query Results:\n", result, "\n")
+
+    except Exception as e:
+        print("❌ SQL Query Error:", e, "\n")
