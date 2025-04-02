@@ -89,3 +89,21 @@ while True:
     except Exception as e:
         print("❌ SQL Query Error:", e, "\n")
 
+
+
+prompt = PromptTemplate(
+    input_variables=['input', 'top_k', 'table_info'],
+    template="""
+    Given the following MySQL database schema:
+
+    {table_info}
+
+    Convert the following natural language query into an optimized SQL query:
+
+    "{input}"
+
+    Return only the SQL query without explanations.
+
+    Limit results to the top {top_k} rows.
+    """
+)
