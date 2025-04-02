@@ -21,9 +21,9 @@ print("Model loaded successfully!")
 def generate_sql_query(prompt: str, schema: str) -> str:
     """Generates SQL query from a given natural language prompt with schema."""
     prompt_template = f"""
-    You are an intelligent AI specialized in generating SQL queries.
-    Your task is to assist users in formulating SQL queries to retrieve specific information from a database.
-    Please provide the SQL query corresponding to the given prompt and schema:
+    You are an AI specialized in generating SQL queries.
+    Provide only the SQL query for the given prompt and schema.
+    Do not include explanations or additional text.
     
     Schema:
     {schema}
@@ -40,17 +40,17 @@ def generate_sql_query(prompt: str, schema: str) -> str:
         generated_ids = model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=50,  # Increased for better response
-            do_sample=False,    # Disables randomness for faster inference
+            max_new_tokens=150,  # Increased to capture full SQL query
+            do_sample=False,    # Ensures deterministic output
             num_beams=1,        # No beam search for efficiency
             pad_token_id=tokenizer.eos_token_id
         )
     
     generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
     
-    # Extract only the SQL output by removing irrelevant prefixes and suffixes
+    # Extract only the SQL query from the output
     sql_output = generated_text.split("SQL:")[-1].strip()
-    sql_output = sql_output.split("\n")[0] if "\n" in sql_output else sql_output
+    sql_output = sql_output.split(";")[0].strip() + ";" if ";" in sql_output else sql_output  # Ensure query ends with a semicolon
     
     return sql_output
 
