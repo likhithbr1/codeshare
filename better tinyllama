@@ -2,16 +2,12 @@ import os
 import sys
 from typing import Optional
 
-# 1) If you installed the standard open-source LangChain:
-# from langchain.sql_database import SQLDatabase
-# from langchain.chains import create_sql_query_chain
-# from langchain.agents.agent_types import AgentType
-# from langchain.agents import create_sql_agent
-
-# 2) If you have "langchain_community" version, do:
+# If you have "langchain_community" installed:
+# pip install -U langchain-community
 from langchain_community.utilities import SQLDatabase
-from langchain.chains import create_sql_query_chain
+from langchain_community.llms import HuggingFacePipeline  # or from langchain_huggingface
 from langchain_community.agent_toolkits import create_sql_agent
+from langchain.chains import create_sql_query_chain
 from langchain.agents.agent_types import AgentType
 
 from sqlalchemy import create_engine
@@ -23,9 +19,9 @@ langchain.debug = True
 ##############################
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from langchain.llms import HuggingFacePipeline
 
 MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
 
 def load_tinyllama_langchain_llm():
     print("⏳ Loading TinyLlama model (HuggingFace style)...")
@@ -46,10 +42,9 @@ def load_tinyllama_langchain_llm():
         top_p=0.9,
         pad_token_id=tokenizer.eos_token_id,
     )
-    # Convert to a LangChain LLM
+    # Convert to a LangChain(-community) LLM
     llm = HuggingFacePipeline(pipeline=hf_pipe)
     return llm
-
 
 ##############################
 # PARTIAL SCHEMA SELECTION
@@ -62,9 +57,6 @@ def pick_tables(question: str, all_tables: list) -> list:
     return relevant or all_tables[:3]
 
 
-##############################
-# MAIN DEMO
-##############################
 def main():
     # 1) Load local TinyLlama model as an LLM
     llm = load_tinyllama_langchain_llm()
@@ -86,22 +78,30 @@ def main():
         if question.strip().lower() in ["exit", "quit"]:
             break
 
-        # 3) (Optional) PARTIAL REFLECTION
-        #    Let's do a quick reflection first to get table names:
+        # 3) PARTIAL REFLECTION: 
+        #    let's reflect only table names first
         wide_db = SQLDatabase.from_uri(db_uri, include_tables=None)
-        all_table_names = wide_db.get_table_names()
 
-        # 4) Choose which tables might be relevant
+        # The new method is get_usable_table_names
+        all_table_names = wide_db.get_usable_table_names()
+        print(f"[DEBUG] Table Names: {all_table_names}")
+
+        # 4) choose relevant tables
         relevant_tables = pick_tables(question, all_table_names)
-        print(f"[*] Using these tables: {relevant_tables}")
+        print(f"[DEBUG] Using these tables: {relevant_tables}")
 
-        # 5) Create a DB object that only reflects columns for relevant tables
+        # 5) reflect columns only for relevant tables
         filtered_db = SQLDatabase.from_uri(db_uri, include_tables=relevant_tables)
 
-        # 6) We'll do the simpler approach: create_sql_query_chain
-        chain = create_sql_query_chain(llm, filtered_db, verbose=True)
+        # 6) create_sql_query_chain (Remove 'verbose' argument)
+        chain = create_sql_query_chain(
+            llm=llm,
+            db=filtered_db
+            # prompt=...,  # if you want a custom prompt
+            # output_parser=...,  # if you want an output parser
+        )
 
-        # 7) Run the chain
+        # 7) run the chain
         try:
             result = chain.run(question)
             print(f"\nAssistant Answer:\n{result}\n")
@@ -110,5 +110,7 @@ def main():
 
     print("👋 Exiting. Goodbye!")
 
+
 if __name__ == "__main__":
     main()
+
