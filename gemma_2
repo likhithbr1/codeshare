@@ -14,13 +14,16 @@ model = AutoModelForCausalLM.from_pretrained(
 model.eval()
 print("Model loaded successfully!")
 
-def generate_sql_query(prompt: str) -> str:
-    """Generates SQL query from a given natural language prompt."""
+def generate_sql_query(prompt: str, schema: str) -> str:
+    """Generates SQL query from a given natural language prompt with schema."""
     prompt_template = f"""
     <start_of_turn>user
     You are an intelligent AI specialized in generating SQL queries.
     Your task is to assist users in formulating SQL queries to retrieve specific information from a database.
-    Please provide the SQL query corresponding to the given prompt:
+    Please provide the SQL query corresponding to the given prompt and schema:
+    
+    Schema:
+    {schema}
     
     Prompt:
     {prompt}
@@ -46,12 +49,22 @@ def generate_sql_query(prompt: str) -> str:
     return sql_output
 
 # Interactive loop for user queries
+sample_schema = """
+CREATE TABLE products (
+    product_id INT,
+    product_name VARCHAR(100),
+    category VARCHAR(50),
+    price DECIMAL(10, 2),
+    stock_quantity INT
+);
+"""
+
 print("\nType your question and get the SQL query (type 'exit' to quit):")
 while True:
     user_input = input("\nUser: ")
     if user_input.lower() == "exit":
         print("Exiting application...")
         break
-    sql_query = generate_sql_query(user_input)
+    sql_query = generate_sql_query(user_input, sample_schema)
     print("\nGenerated SQL Query:")
     print(sql_query)
