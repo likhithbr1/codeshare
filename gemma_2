@@ -1,0 +1,57 @@
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+# Load model and tokenizer once
+print("Loading model... (This may take some time)")
+tokenizer = AutoTokenizer.from_pretrained("suriya7/Gemma2B-Finetuned-Sql-Generator")
+model = AutoModelForCausalLM.from_pretrained(
+    "suriya7/Gemma2B-Finetuned-Sql-Generator",
+    torch_dtype=torch.float32,  # Use float32 for CPU compatibility
+    low_cpu_mem_usage=True
+)
+
+# Set model to evaluation mode to save memory
+model.eval()
+print("Model loaded successfully!")
+
+def generate_sql_query(prompt: str) -> str:
+    """Generates SQL query from a given natural language prompt."""
+    prompt_template = f"""
+    <start_of_turn>user
+    You are an intelligent AI specialized in generating SQL queries.
+    Your task is to assist users in formulating SQL queries to retrieve specific information from a database.
+    Please provide the SQL query corresponding to the given prompt:
+    
+    Prompt:
+    {prompt}
+    <end_of_turn>
+    <start_of_turn>model
+    """
+    
+    inputs = tokenizer(prompt_template, return_tensors="pt", truncation=True)
+    
+    with torch.no_grad():
+        generated_ids = model.generate(
+            inputs["input_ids"],
+            max_new_tokens=50,  # Keeps it lightweight for CPU
+            do_sample=False,    # Disables randomness for faster inference
+            num_beams=1,        # No beam search for efficiency
+            pad_token_id=tokenizer.eos_token_id
+        )
+    
+    generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+    
+    # Extract model's SQL output
+    sql_output = generated_text.split("<start_of_turn>model")[-1].strip()
+    return sql_output
+
+# Interactive loop for user queries
+print("\nType your question and get the SQL query (type 'exit' to quit):")
+while True:
+    user_input = input("\nUser: ")
+    if user_input.lower() == "exit":
+        print("Exiting application...")
+        break
+    sql_query = generate_sql_query(user_input)
+    print("\nGenerated SQL Query:")
+    print(sql_query)
