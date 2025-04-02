@@ -10,6 +10,10 @@ model = AutoModelForCausalLM.from_pretrained(
     low_cpu_mem_usage=True
 )
 
+# Optimize model for inference if torch.compile is available
+if hasattr(torch, "compile"):
+    model = torch.compile(model)
+
 # Set model to evaluation mode to save memory
 model.eval()
 print("Model loaded successfully!")
@@ -31,12 +35,14 @@ def generate_sql_query(prompt: str, schema: str) -> str:
     <start_of_turn>model
     """
     
-    inputs = tokenizer(prompt_template, return_tensors="pt", truncation=True)
+    inputs = tokenizer(prompt_template, return_tensors="pt", truncation=True, max_length=512, padding=True)
+    inputs["attention_mask"] = inputs["input_ids"] != tokenizer.pad_token_id  # Explicit attention mask
     
-    with torch.no_grad():
+    with torch.inference_mode():
         generated_ids = model.generate(
             inputs["input_ids"],
-            max_new_tokens=50,  # Keeps it lightweight for CPU
+            attention_mask=inputs["attention_mask"],
+            max_new_tokens=30,  # Reduced for faster response
             do_sample=False,    # Disables randomness for faster inference
             num_beams=1,        # No beam search for efficiency
             pad_token_id=tokenizer.eos_token_id
